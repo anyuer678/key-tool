@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>API Key 生成器</title>
+<style>
+  :root {
+    --ink: #2b2b28; --ink-soft: #6b6a63; --line: #d9d7cf;
+    --paper: #faf9f5; --accent: #8a6d3b; --danger: #9c3d2e; --ok: #3d6b4f;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink);
+    font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif; line-height: 1.6; }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 32px 20px 80px; }
+  h1 { font-size: 21px; font-weight: 600; letter-spacing: .5px; margin: 0 0 4px; }
+  .sub { font-size: 13px; color: var(--ink-soft); margin-bottom: 16px; }
+  .card { border: 1px solid var(--line); border-radius: 4px; padding: 18px;
+    background: #fff; margin-bottom: 18px; }
+  h2 { font-size: 14px; font-weight: 600; margin: 0 0 12px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px 12px; }
+  .field label { display: block; color: var(--ink-soft); font-size: 12px; margin-bottom: 3px; }
+  input[type=text], input[type=number], input[type=password], select {
+    width: 100%; padding: 6px 9px; border: 1px solid var(--line);
+    border-radius: 3px; background: #fff; font-size: 13.5px; color: var(--ink); }
+  button { border: 1px solid var(--ink); background: transparent; color: var(--ink);
+    padding: 6px 14px; font-size: 13px; cursor: pointer; border-radius: 3px; }
+  button:hover { background: var(--ink); color: #fff; }
+  .btn-primary { background: var(--ink); color: #fff; }
+  .btn-danger { border-color: var(--danger); color: var(--danger); }
+  .btn-danger:hover { background: var(--danger); color: #fff; }
+  .actions { margin-top: 12px; }
+  .key-box { display: flex; gap: 8px; align-items: center;
+    border: 1px dashed var(--line); padding: 10px; background: var(--paper); }
+  .key-box code { flex: 1; word-break: break-all; font-size: 13px; user-select: all; }
+  .warn { color: var(--danger); font-size: 12px; margin-top: 6px; }
+  .ok { color: var(--ok); font-size: 13px; margin-top: 6px; }
+  .err { color: var(--danger); font-size: 13px; margin-top: 8px; white-space: pre-wrap; }
+  .mono { font-family: Consolas, monospace; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th, td { border-bottom: 1px solid var(--line); padding: 5px 7px; text-align: left;
+    vertical-align: top; }
+  th { color: var(--ink-soft); font-weight: 500; white-space: nowrap; }
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 14px; }
+  .tabs button { border: 1px solid transparent; border-bottom: none; border-radius: 4px 4px 0 0;
+    padding: 7px 16px; background: transparent; color: var(--ink-soft); }
+  .tabs button.active { border-color: var(--line); background: #fff; color: var(--ink);
+    font-weight: 600; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+  .bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+  .bar input, .bar select { max-width: 190px; }
+  .hint { font-size: 12px; color: var(--ink-soft); margin-top: 3px; }
+  code.inline { background: #f0efe9; padding: 1px 5px; border-radius: 2px; font-size: 12px; }
+  .copy-line { display: flex; gap: 6px; align-items: center; margin-top: 6px; }
+  .copy-line code { flex: 1; font-size: 11.5px; background: #f0efe9; padding: 6px 8px;
+    border-radius: 3px; word-break: break-all; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>API Key 生成器</h1>
+  <div class="sub">项目 / 共享额度池 / 余额计费 / 模型绑定 · 转发任意 OpenAI 兼容上游（支持 SDK 直连与流式）</div>
+
+  <div class="card">
+    <h2>签发 Key</h2>
+    <div class="bar">
+      <select id="tpl" style="max-width:180px">
+        <option value="">自定义…</option>
+        <option value="once">一次性（1 次）</option>
+        <option value="monthly">月度开发（1000 次/100万tok）</option>
+        <option value="dev">开发（1 万次/30 天）</option>
+        <option value="prod">生产（500万tok/90 天）</option>
+      </select>
+      <select id="project"><option value="">无项目</option></select>
+      <select id="provider"><option value="">服务商不限</option></select>
+    </div>
+    <div class="grid">
+      <div class="field"><label>调用次数（留空不限）</label><input type="number" id="calls" min="1" placeholder="如 1000"></div>
+      <div class="field"><label>Token 额度（留空不限）</label><input type="number" id="tokens" min="1" placeholder="如 1000000"></div>
+      <div class="field"><label>有效期</label><input type="text" id="expires" placeholder="如 30d / 12h"></div>
+      <div class="field"><label>周期重置</label>
+        <select id="cycle"><option value="">不重置</option><option value="monthly">每月</option><option value="daily">每天</option><option value="hourly">每小时</option></select>
+      </div>
+      <div class="field"><label>绑定模型</label>
+        <input type="text" id="model" list="modelList" placeholder="选择或输入">
+        <datalist id="modelList"></datalist>
+      </div>
+      <div class="field"><label>限流 RPS</label><input type="number" id="rps" min="1" placeholder="留空=全局"></div>
+      <div class="field"><label>备注</label><input type="text" id="note" placeholder="可选"></div>
+    </div>
+    <div class="actions">
+      <button class="btn-primary" id="genBtn">生成 Key</button>
+      <span class="ok" id="statusLine" style="margin-left:10px"></span>
+    </div>
+    <div class="err" id="errorText"></div>
+
+    <div id="result" hidden style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px">
+      <div class="key-box"><code id="keyText"></code><button id="copyBtn">复制</button></div>
+      <div class="warn">明文 key 只显示这一次，请立即保存。公开 ID：<span class="mono" id="metaId"></span></div>
+      <div class="copy-line"><code id="curlLine"></code><button data-copy="curlLine">复制 curl</button></div>
+      <div class="copy-line"><code id="curlOpenai"></code><button data-copy="curlOpenai">复制 OpenAI 兼容</button></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="bar">
+      <h2 style="margin:0">管理</h2>
+      <input type="password" id="adminToken" placeholder="管理令牌（登录用）" style="max-width:200px">
+      <button id="loginBtn">登录</button>
+      <button id="logoutBtn" hidden>登出</button>
+      <span class="ok" id="loginStatus"></span>
+    </div>
+    <div class="tabs">
+      <button data-tab="keys" class="active">Key</button>
+      <button data-tab="projects">项目</button>
+      <button data-tab="providers">服务商</button>
+      <button data-tab="pricing">定价</button>
+      <button data-tab="stats">报表</button>
+    </div>
+
+    <div class="tab-panel active" id="tab-keys">
+      <div class="bar">
+        <button id="refreshKeys">刷新</button>
+        <select id="keyFilter"><option value="">全部</option><option value="active">活跃</option><option value="revoked">已吊销</option></select>
+        <button id="batchRevoke" class="btn-danger" disabled>批量吊销选中</button>
+        <span class="ok" id="adminStatus"></span>
+      </div>
+      <table>
+        <thead><tr><th><input type="checkbox" id="checkAll"></th><th>ID</th><th>项目</th><th>状态</th>
+          <th>次数</th><th>Token</th><th>绑定</th><th>创建</th><th>操作</th></tr></thead>
+        <tbody id="keyList"></tbody>
+      </table>
+      <div class="err" id="adminError"></div>
+      <details id="logBox" hidden style="margin-top:12px">
+        <summary id="logTitle">审计日志</summary>
+        <table><thead><tr><th>时间</th><th>动作</th><th>变动</th><th>详情</th></tr></thead>
+          <tbody id="logList"></tbody></table>
+      </details>
+    </div>
+
+    <div class="tab-panel" id="tab-projects">
+      <div class="bar">
+        <input type="text" id="pjName" placeholder="项目名*">
+        <input type="number" id="pjCalls" placeholder="次数">
+        <input type="number" id="pjTokens" placeholder="token">
+        <input type="number" id="pjBalance" placeholder="余额(元)" step="0.01">
+        <button id="pjAdd">创建项目</button>
+      </div>
+      <table>
+        <thead><tr><th>项目</th><th>次数</th><th>Token</th><th>余额</th><th>操作</th></tr></thead>
+        <tbody id="projectList"></tbody>
+      </table>
+    </div>
+
+    <div class="tab-panel" id="tab-providers">
+      <div class="bar">
+        <button id="pvPresets">一键添加内置预设</button>
+        <span class="hint">已内置 DeepSeek / OpenAI / Ollama / Kimi / 智谱 / Qwen，只需给要用的填 api_key</span>
+      </div>
+      <div class="bar">
+        <input type="text" id="pvId" placeholder="id* 如 deepseek">
+        <input type="text" id="pvName" placeholder="名称*">
+        <input type="text" id="pvUrl" placeholder="base_url* 如 https://api.deepseek.com/v1">
+        <input type="password" id="pvKey" placeholder="api_key* 或 ${ENV_VAR}">
+        <input type="text" id="pvModel" placeholder="默认模型">
+        <input type="text" id="pvModels" placeholder="模型列表(逗号分隔)">
+        <label style="font-size:12px"><input type="checkbox" id="pvDefault"> 默认</label>
+        <button id="pvAdd">手动添加</button>
+      </div>
+      <table>
+        <thead><tr><th>id</th><th>名称</th><th>默认模型</th><th>模型</th><th>默认</th><th>api_key</th><th>操作</th></tr></thead>
+        <tbody id="providerList"></tbody>
+      </table>
+    </div>
+
+    <div class="tab-panel" id="tab-pricing">
+      <div class="bar">
+        <input type="text" id="prProvider" placeholder="服务商*">
+        <input type="text" id="prModel" placeholder="模型*">
+        <input type="number" id="prPrice" placeholder="元/1M*" step="0.01">
+        <button id="prAdd">设置</button>
+      </div>
+      <table><thead><tr><th>服务商</th><th>模型</th><th>元/1M</th></tr></thead>
+        <tbody id="pricingList"></tbody></table>
+    </div>
+
+    <div class="tab-panel" id="tab-stats">
+      <div class="bar"><span class="hint">近 30 天用量</span></div>
+      <table><thead><tr><th>日期</th><th>调用</th><th>Token</th><th>金额(元)</th></tr></thead>
+        <tbody id="statsList"></tbody></table>
+      <div class="ok" id="statsTotal"></div>
+    </div>
+  </div>
+
+  <div class="sub" style="margin-top:16px">
+    消费：<code class="inline">POST /v1/chat/completions</code>（OpenAI SDK 直连，Bearer 鉴权）·
+    管理：<code class="inline">POST /keys</code> <code class="inline">/projects</code> <code class="inline">/providers</code> <code class="inline">/pricing</code> <code class="inline">/stats/usage</code> ·
+    CLI：<code class="inline">python keytool.py issue / chat / list</code>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let providersData = {providers: [], default: null};
+let projectsData = [];
+
+async function api(path, opts = {}) {
+  opts.headers = {...(opts.headers || {}), ...adminHeaders()};
+  const r = await fetch(path, opts);
+  let data = null;
+  try { data = await r.json(); } catch (e) {}
+  if (!r.ok) {
+    const d = data && data.detail ? (typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail)) : ('HTTP ' + r.status);
+    if (r.status === 401) $('adminError').textContent = '需要管理令牌：请在左侧输入并登录';
+    else $('adminError').textContent = d;
+    throw new Error(d);
+  }
+  return data;
+}
+function adminHeaders() { const t = $('adminToken').value.trim(); return t ? {'X-Admin-Token': t} : {}; }
+function num(v) { const n = parseInt(v, 10); return (v === '' || isNaN(n) || n <= 0) ? null : n; }
+function fmt(v, s = '') { return (v === null || v === undefined) ? '∞' : v + s; }
+function ft(iso) { return iso ? new Date(iso).toLocaleString() : '—'; }
+// HTML 转义：所有渲染到 innerHTML 的用户输入必须过 esc()
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+
+// ---------- 服务商 & 项目 ----------
+async function loadProviders() {
+  try {
+    providersData = await api('/providers');
+    const sel = $('provider'); sel.innerHTML = '<option value="">服务商不限</option>';
+    for (const p of providersData.providers) {
+      const o = document.createElement('option');
+      o.value = p.id;
+      o.textContent = p.name + (p.id === providersData.default ? '（默认）' : '') + (p.needs_key ? '（未配置key）' : '');
+      sel.appendChild(o);
+    }
+    fillModelList(sel.value); renderProviders();
+  } catch (e) {}
+}
+function fillModelList(pid) {
+  const dl = $('modelList'); dl.innerHTML = '';
+  const p = providersData.providers.find(x => x.id === pid);
+  if (!p) return;
+  for (const m of p.models) { const o = document.createElement('option'); o.value = m; dl.appendChild(o); }
+  if (p.default_model) $('model').value = p.default_model;
+}
+$('provider').addEventListener('change', () => fillModelList($('provider').value));
+
+async function loadProjects() {
+  try {
+    projectsData = (await api('/projects')).items;
+    const sel = $('project'); sel.innerHTML = '<option value="">无项目</option>';
+    for (const p of projectsData) { const o = document.createElement('option'); o.value = p.id; o.textContent = p.name; sel.appendChild(o); }
+    renderProjects();
+  } catch (e) {}
+}
+
+// ---------- 签发模板 ----------
+const TEMPLATES = {
+  once: {calls: 1, tokens: null, expires: null, cycle: '', note: '一次性'},
+  monthly: {calls: 1000, tokens: 1000000, expires: null, cycle: 'monthly', note: ''},
+  dev: {calls: 10000, tokens: null, expires: '30d', cycle: '', note: ''},
+  prod: {calls: null, tokens: 5000000, expires: '90d', cycle: '', note: ''},
+};
+$('tpl').addEventListener('change', () => {
+  const t = TEMPLATES[$('tpl').value];
+  if (!t) return;
+  $('calls').value = t.calls || ''; $('tokens').value = t.tokens || '';
+  $('expires').value = t.expires || ''; $('cycle').value = t.cycle || '';
+  $('note').value = t.note || '';
+});
+
+// ---------- 签发 ----------
+async function generate() {
+  $('errorText').textContent = ''; $('result').hidden = true;
+  const body = {
+    calls: num($('calls').value), tokens: num($('tokens').value),
+    expires: $('expires').value.trim() || null, cycle: $('cycle').value || null,
+    provider: $('provider').value || null, model: $('model').value.trim() || null,
+    project_id: $('project').value || null, rps_limit: num($('rps').value),
+    note: $('note').value.trim() || null,
+  };
+  try {
+    const data = await api('/keys', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+    $('keyText').textContent = data.key;
+    $('metaId').textContent = data.id;
+    $('curlLine').textContent =
+      `curl -X POST http://localhost:8000/v1/chat -H "X-Api-Key: ${data.key}" -H "Content-Type: application/json" -d '{"prompt":"你好","max_tokens":256}'`;
+    $('curlOpenai').textContent =
+      `curl -X POST http://localhost:8000/v1/chat/completions -H "Authorization: Bearer ${data.key}" -H "Content-Type: application/json" -d '{"model":"${body.model || 'default'}","messages":[{"role":"user","content":"你好"}]}'`;
+    $('result').hidden = false; $('statusLine').textContent = '签发成功';
+    loadKeys();
+  } catch (e) {} finally { $('tpl').value = ''; }
+}
+$('genBtn').addEventListener('click', generate);
+$('copyBtn').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText($('keyText').textContent); $('copyBtn').textContent = '已复制'; setTimeout(() => $('copyBtn').textContent = '复制', 1500); } catch (e) {}
+});
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-copy]');
+  if (!btn) return;
+  const el = $(btn.dataset.copy);
+  navigator.clipboard.writeText(el.textContent).then(() => { btn.textContent = '已复制'; setTimeout(() => btn.textContent = '复制 curl', 1500); }).catch(() => {});
+});
+
+// ---------- 登录 ----------
+async function adminLogin() {
+  const token = $('adminToken').value.trim();
+  if (!token) { $('loginStatus').textContent = '请输入令牌'; return; }
+  try {
+    const r = await fetch('/admin/login', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({token})});
+    const data = await r.json();
+    if (!r.ok) { $('loginStatus').textContent = '登录失败'; return; }
+    $('adminToken').value = ''; checkAdmin(); refreshAll();
+  } catch (e) {}
+}
+async function adminLogout() { try { await fetch('/admin/logout', {method: 'POST'}); } catch (e) {} checkAdmin(); }
+async function checkAdmin() {
+  try {
+    const d = await (await fetch('/admin/me')).json();
+    $('loginStatus').textContent = d.admin ? '已登录（会话 12h）' : '未登录';
+    $('logoutBtn').hidden = !d.admin; $('loginBtn').hidden = d.admin;
+  } catch (e) {}
+}
+$('loginBtn').addEventListener('click', adminLogin);
+$('logoutBtn').addEventListener('click', adminLogout);
+
+// ---------- Tab ----------
+document.querySelectorAll('.tabs button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    $(`tab-${btn.dataset.tab}`).classList.add('active');
+    if (btn.dataset.tab === 'stats') loadStats();
+    if (btn.dataset.tab === 'pricing') loadPricing();
+  });
+});
+
+// ---------- Key 列表 + 批量 ----------
+let selectedKeys = new Set();
+function renderKeyList(items) {
+  const tb = $('keyList'); tb.innerHTML = '';
+  if (!items.length) { tb.innerHTML = '<tr><td colspan="9" style="color:var(--ink-soft)">暂无 key</td></tr>'; return; }
+  for (const k of items) {
+    const pj = projectsData.find(x => x.id === k.project_id);
+    const binding = [k.provider, k.model].filter(Boolean).join(' / ') || '—';
+    const color = k.status === 'active' ? 'var(--ok)' : 'var(--danger)';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td><input type="checkbox" class="key-check" data-id="${k.id}" ${selectedKeys.has(k.id) ? 'checked' : ''}></td>
+      <td class="mono" style="font-size:11px">${k.id}</td><td>${pj ? esc(pj.name) : '—'}</td>
+      <td style="color:${color}">${k.status}</td>
+      <td>${fmt(k.calls.used)}/${fmt(k.calls.total)}</td><td>${fmt(k.tokens.used)}/${fmt(k.tokens.total)}</td>
+      <td>${esc(binding)}${k.rps_limit ? ' · ' + k.rps_limit + 'rps' : ''}</td>
+      <td style="font-size:12px">${ft(k.created_at)}</td>
+      <td style="white-space:nowrap">
+        <button data-act="logs" data-id="${k.id}" style="padding:2px 8px">日志</button>
+        <button data-act="rotate" data-id="${k.id}" style="padding:2px 8px">重签</button>
+        <button data-act="revoke" data-id="${k.id}" style="padding:2px 8px">吊销</button>
+        <button data-act="recharge" data-id="${k.id}" style="padding:2px 8px">充值</button>
+      </td>`;
+    tb.appendChild(tr);
+  }
+  updateBatchBtn();
+}
+async function loadKeys() {
+  $('adminError').textContent = '';
+  const f = $('keyFilter').value;
+  try {
+    const data = await api('/keys?limit=100' + (f ? '&status=' + f : ''));
+    $('adminStatus').textContent = `共 ${data.total} 个 key`;
+    renderKeyList(data.items);
+  } catch (e) {}
+}
+function updateBatchBtn() {
+  $('batchRevoke').disabled = selectedKeys.size === 0;
+  $('batchRevoke').textContent = `批量吊销选中（${selectedKeys.size}）`;
+}
+document.addEventListener('change', (e) => {
+  if (e.target.classList && e.target.classList.contains('key-check')) {
+    const id = e.target.dataset.id;
+    e.target.checked ? selectedKeys.add(id) : selectedKeys.delete(id);
+    updateBatchBtn();
+  }
+});
+$('checkAll').addEventListener('change', (e) => {
+  document.querySelectorAll('.key-check').forEach(c => { c.checked = e.target.checked; });
+  selectedKeys = e.target.checked ? new Set([...document.querySelectorAll('.key-check')].map(c => c.dataset.id)) : new Set();
+  updateBatchBtn();
+});
+$('batchRevoke').addEventListener('click', async () => {
+  if (!confirm(`吊销选中的 ${selectedKeys.size} 个 key？`)) return;
+  for (const id of selectedKeys) { try { await api(`/keys/${id}/revoke`, {method: 'POST'}); } catch (e) {} }
+  selectedKeys.clear(); loadKeys();
+});
+$('refreshKeys').addEventListener('click', loadKeys);
+$('keyFilter').addEventListener('change', loadKeys);
+
+async function loadLogs(id) {
+  try {
+    const data = await api(`/keys/${id}/logs?limit=50`);
+    $('logTitle').textContent = `审计日志（${id}，共 ${data.total} 条）`;
+    const tb = $('logList'); tb.innerHTML = '';
+    const labels = {reserve: '预扣', settle: '结算', refund: '退款', revoke: '吊销', recharge: '充值', rotate: '重签', settle_reserved: '预扣(已结算)', refund_reserved: '预扣(已退款)'};
+    for (const l of data.items) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td style="font-size:12px">${ft(l.created_at)}</td><td>${labels[l.action] || l.action}</td>
+        <td style="font-size:12px">${l.call_cost ? l.call_cost + ' 次 / ' : ''}${l.amount !== 0 ? l.amount + ' tok' : ''}${l.cost ? ' / ¥' + l.cost : ''}</td>
+        <td style="font-size:12px;color:var(--ink-soft)">${esc(l.detail || '')}</td>`;
+      tb.appendChild(tr);
+    }
+    $('logBox').hidden = false;
+  } catch (e) {}
+}
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-act]');
+  if (!btn) return;
+  const {act, id} = btn.dataset;
+  if (act === 'logs') loadLogs(id);
+  else if (act === 'revoke') { if (confirm('吊销 ' + id + '？')) api(`/keys/${id}/revoke`, {method: 'POST'}).then(loadKeys).catch(() => {}); }
+  else if (act === 'rotate') { api(`/keys/${id}/rotate`, {method: 'POST'}).then(d => { alert('新 key（明文仅此一次）:\n' + d.key); loadKeys(); }).catch(() => {}); }
+  else if (act === 'recharge') {
+    const calls = prompt('追加次数（留空不变）', ''); if (calls === null) return;
+    const tokens = prompt('追加 token（留空不变）', ''); if (tokens === null) return;
+    const body = {};
+    const c = parseInt(calls, 10), t = parseInt(tokens, 10);
+    if (calls !== '' && !isNaN(c) && c > 0) body.calls = c;
+    if (tokens !== '' && !isNaN(t) && t > 0) body.tokens = t;
+    if (Object.keys(body).length) api(`/keys/${id}/recharge`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)}).then(loadKeys).catch(() => {});
+  }
+});
+
+// ---------- 项目 ----------
+function renderProjects() {
+  const tb = $('projectList'); tb.innerHTML = '';
+  for (const p of projectsData) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${esc(p.name)}${p.owner ? ' <span style="color:var(--ink-soft)">(' + esc(p.owner) + ')</span>' : ''}</td>
+      <td>${fmt(p.calls.used)}/${fmt(p.calls.total)}</td><td>${fmt(p.tokens.used)}/${fmt(p.tokens.total)}</td>
+      <td>${p.balance === null ? '不计费' : '¥' + p.balance}</td>
+      <td><button data-pj="recharge" data-id="${p.id}" style="padding:2px 8px">充值</button></td>`;
+    tb.appendChild(tr);
+  }
+}
+$('pjAdd').addEventListener('click', async () => {
+  const body = {name: $('pjName').value.trim()};
+  if (!body.name) { alert('项目名必填'); return; }
+  const c = num($('pjCalls').value), t = num($('pjTokens').value), b = parseFloat($('pjBalance').value);
+  if (c) body.calls = c; if (t) body.tokens = t; if (!isNaN(b)) body.balance = b;
+  try { await api('/projects', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)}); loadProjects(); } catch (e) {}
+});
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-pj]');
+  if (!btn || btn.dataset.pj !== 'recharge') return;
+  const calls = prompt('追加次数（留空不变）', ''); if (calls === null) return;
+  const tokens = prompt('追加 token（留空不变）', ''); if (tokens === null) return;
+  const balance = prompt('充值余额（元，留空不变）', ''); if (balance === null) return;
+  const body = {};
+  const c = parseInt(calls, 10), t = parseInt(tokens, 10), b = parseFloat(balance);
+  if (calls !== '' && !isNaN(c) && c > 0) body.calls = c;
+  if (tokens !== '' && !isNaN(t) && t > 0) body.tokens = t;
+  if (balance !== '' && !isNaN(b)) body.balance = b;
+  if (Object.keys(body).length) api(`/projects/${btn.dataset.id}/recharge`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)}).then(loadProjects).catch(() => {});
+});
+
+// ---------- 服务商 ----------
+function renderProviders() {
+  const tb = $('providerList'); tb.innerHTML = '';
+  if (!providersData.providers.length) {
+    tb.innerHTML = '<tr><td colspan="7" style="color:var(--ink-soft)">尚无服务商 — 点上方「一键添加内置预设」或手动添加</td></tr>';
+    return;
+  }
+  for (const p of providersData.providers) {
+    const tr = document.createElement('tr');
+    const keyState = p.needs_key
+      ? '<span style="color:var(--danger)">未配置</span>'
+      : '<span style="color:var(--ok)">已配置</span>';
+    tr.innerHTML = `<td class="mono">${p.id}</td><td>${esc(p.name)}</td><td>${esc(p.default_model || '—')}</td>
+      <td>${esc((p.models || []).join(', '))}</td><td>${p.id === providersData.default ? '★' : ''}</td>
+      <td>${keyState}</td>
+      <td style="white-space:nowrap">
+        <button data-pv="key" data-id="${p.id}" style="padding:2px 8px">填 key</button>
+        <button data-pv="del" data-id="${p.id}" style="padding:2px 8px">删除</button>
+      </td>`;
+    tb.appendChild(tr);
+  }
+}
+$('pvAdd').addEventListener('click', async () => {
+  const body = {
+    id: $('pvId').value.trim(), name: $('pvName').value.trim(),
+    base_url: $('pvUrl').value.trim(), api_key: $('pvKey').value,
+    default_model: $('pvModel').value.trim() || null,
+    models: $('pvModels').value.split(',').map(s => s.trim()).filter(Boolean),
+    is_default: $('pvDefault').checked,
+  };
+  if (!body.id || !body.name || !body.base_url || !body.api_key) { alert('id/名称/base_url/api_key 必填'); return; }
+  try { await api('/providers', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)}); loadProviders(); } catch (e) {}
+});
+$('pvPresets').addEventListener('click', async () => {
+  try {
+    const data = await api('/providers/presets', {method: 'POST'});
+    alert(`已添加 ${data.added} 个预设服务商（共 ${data.total} 个）`);
+    loadProviders();
+  } catch (e) {}
+});
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-pv]');
+  if (!btn) return;
+  if (btn.dataset.pv === 'del') {
+    if (confirm('删除服务商 ' + btn.dataset.id + '？')) api('/providers/' + btn.dataset.id, {method: 'DELETE'}).then(loadProviders).catch(() => {});
+  } else if (btn.dataset.pv === 'key') {
+    const key = prompt('填入 ' + btn.dataset.id + ' 的 api_key（支持 ${ENV_VAR}）：', '');
+    if (key === null) return;
+    if (!key.trim()) { alert('不能为空'); return; }
+    api('/providers/' + btn.dataset.id + '/key', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({api_key: key})})
+      .then(loadProviders).catch(() => {});
+  }
+});
+
+// ---------- 定价 ----------
+async function loadPricing() {
+  try {
+    const data = await api('/pricing');
+    const tb = $('pricingList'); tb.innerHTML = '';
+    for (const p of data.items) { const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${p.provider}</td><td>${p.model}</td><td>${p.price_per_million}</td>`; tb.appendChild(tr); }
+  } catch (e) {}
+}
+$('prAdd').addEventListener('click', async () => {
+  const body = {provider: $('prProvider').value.trim(), model: $('prModel').value.trim(), price_per_million: parseFloat($('prPrice').value)};
+  if (!body.provider || !body.model || isNaN(body.price_per_million)) { alert('服务商/模型/单价必填'); return; }
+  try { await api('/pricing', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)}); loadPricing(); } catch (e) {}
+});
+
+// ---------- 报表 ----------
+async function loadStats() {
+  try {
+    const data = await api('/stats/usage?days=30');
+    const tb = $('statsList'); tb.innerHTML = '';
+    for (const d of data.days) { const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${d.date}</td><td>${d.calls}</td><td>${d.tokens}</td><td>${d.cost.toFixed(4)}</td>`; tb.appendChild(tr); }
+    $('statsTotal').textContent = `近 30 天：${data.total.calls} 次 / ${data.total.tokens} tok / ¥${data.total.cost.toFixed(4)} · 累计：${data.project_totals.calls} 次 / ${data.project_totals.tokens} tok / ¥${data.project_totals.cost.toFixed(4)}`;
+  } catch (e) {}
+}
+
+function refreshAll() { loadKeys(); loadProjects(); loadPricing(); loadStats(); }
+checkAdmin();
+loadProviders();
+refreshAll();
+</script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+services:
+  keytool:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      # 必改：管理密码
+      KEYTOOL_ADMIN_TOKEN: change-me
+      # 建议设置：Fernet key（python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"）
+      KEYTOOL_SECRET_KEY: ""
+      # 可选：多实例共享限流；不设则用进程内限流
+      REDIS_URL: "redis://redis:6379/0"
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
