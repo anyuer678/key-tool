@@ -1,4 +1,9 @@
-﻿# key-tool —— API Key 生成器（多租户网关）
+# key-tool —— API Key 生成器（多租户网关）
+
+> **ARCHIVED** · 本仓已归档，不再维护。  
+> 个人 API 密钥管理请使用 **[keyvault](https://github.com/anyuer678/keyvault)**。  
+> **安全警告**：历史版本在未设置 `KEYTOOL_ADMIN_TOKEN` 时管理接口可能放行；未设置 `KEYTOOL_SECRET_KEY` 时服务商密钥可能明文落库。**禁止**将归档版本部署到任何可访问网络。  
+> 状态标签：`archived` · 仅作作品集/历史参考。
 
 > 多维度限额密钥签发 / 消费服务：项目 / 共享额度池 / 余额计费 / 模型绑定 / 限流，转发任意 OpenAI 兼容上游（DeepSeek / OpenAI / Ollama / Kimi / 智谱 / Qwen…），支持 OpenAI SDK 直连与流式。
 
